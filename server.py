@@ -3,7 +3,7 @@ import threading
 import socket
 import sys
 
-PORT = 5001
+PORT = 5004
 
 
 class ChatServer(threading.Thread):
@@ -21,6 +21,10 @@ class ChatServer(threading.Thread):
 
         try:
             self.server.bind((self.host, self.port))
+        except OSError:
+            self.port += 1
+            self.server.bind((self.host, self.port))
+            print('Bind failed on Port {}. Switching to Port {}'.format(self.port - 1,self.port))
         except socket.error:
             print('Bind failed {}'.format(socket.error))
             sys.exit()
@@ -42,19 +46,18 @@ class ChatServer(threading.Thread):
                 list_of_users = ''
                 for user in self.client_pool:
                     list_of_users += user.nick + '\n'
-                [c.conn.sendall(list_of_users.encode()) for c in self.client_pool if c.id == id]
+                conn.sendall(list_of_users.encode())
 
             elif data[0] == '@nickname':
                 if len(data[1].split(' ')) > 1:
                     response = 'User Name can only be one word.\n'
-                    [c.conn.sendall(response.encode()) for c in self.client_pool if c.id == id]
+                    conn.sendall(response.encode())
                 else:
                     for c in self.client_pool:
                         if c.id == id:
                             c.nick = data[1].strip('\n')
-                            print(c.nick.encode())
                             response = 'Your nickname is now {}\n'.format(c.nick)
-                            [c.conn.sendall(response.encode()) for c in self.client_pool if c.id == id]
+                            c.conn.sendall(response.encode())
 
             elif data[0] == '@dm':
                 recipient = data[1].split(maxsplit=1)[0]
@@ -79,24 +82,23 @@ class ChatServer(threading.Thread):
         print('{} connected with {}:{}'.format(
             client.nick, client.addr[0], str(client.addr[1])))
         message_complete = False
-        message_received = False
         message = ''
         buffer_length = 4096
 
         try:
             while not message_complete:
-                if message_received:
-                    message = ''
-                    message_received = False
                 part = client.conn.recv(buffer_length)
                 message += part.decode()
                 if len(part) < buffer_length:
-                    print('Message complete')
                     self.parser(client.id, client.nick, client.conn, message)
-                    message_received = True
+                    message = ''
 
-        except (ConnectionResetError, BrokenPipeError, OSError):
+        except (ConnectionResetError, BrokenPipeError):
             client.conn.close()
+
+        except (OSError):
+            global PORT
+            PORT += 1
 
         except (KeyboardInterrupt):
             message = 'LeftWithControlC'
@@ -122,5 +124,10 @@ if __name__ == '__main__':
     server = ChatServer(PORT)
     try:
         server.run()
-    except KeyboardInterrupt:
-        server.exit()
+    except (KeyboardInterrupt, OSError) as e:
+        if isinstance(e, OSError):
+            PORT += 1
+            server.run()
+        else:
+            [c.conn.close() for c in server.client_pool if len(server.client_pool)]
+            server.exit()
