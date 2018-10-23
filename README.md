@@ -1,5 +1,5 @@
-# tcp_chat_server
- **Author**: Roman Kireev with Ben Hurst
+# TCP Chat Server
+ **Author**: Ben Hurst
  **Version**: 1.0.0
  ## Overview
  TCP-based chatroom using Python’s low-level socket interface.
@@ -14,8 +14,7 @@
  ## Architecture
 Python 3.7, Pytest, Socket, Treading
 GitHub
- ## API
-no API
+
  ## Change Log
  08-20-2018 17:50 Basic Functionality Done
  08-21-2018 10:30 Added simple port scanner
